@@ -5,9 +5,8 @@ import random
 from datetime import datetime
 
 # --- CONFIGURATION FROM THE DOCUMENT (Table 1) ---
-# Addresses from the "Smart Contract Architecture" section
-POLYMARKET_CTF_EXCHANGE = "0x4bFb41dCD88A3F0A2E6960113cB8459F4664E3a2" # Example CTF Proxy
-CONDITIONAL_TOKENS = "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045"     # Example CTF Framework
+POLYMARKET_CTF_EXCHANGE = "0x4bFb41dCD88A3F0A2E6960113cB8459F4664E3a2" 
+CONDITIONAL_TOKENS = "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045"     
 
 # --- PAGE SETUP ---
 st.set_page_config(
@@ -37,30 +36,25 @@ if not use_demo_data:
 def get_order_book_depth(market_id):
     """
     Simulates the logic from Section 4: Fetching 'OrderCreated' events.
-    In production, this would use web3.eth.get_logs() on the CTF Exchange contract.
     """
-    # SIMULATED DATA for visualization purposes
-    # Real implementation would query: w3.eth.get_logs({'address': CTF_EXCHANGE, 'topics': [OrderCreated_event_hash]})
-    
+    # SIMULATED DATA
     bids_volume = random.randint(50000, 500000)
     asks_volume = random.randint(50000, 500000)
-    spread = round(random.uniform(0.001, 0.05), 4) # Tight spread = Solid
+    spread = round(random.uniform(0.001, 0.05), 4) 
     
     return {
         "liquidity_score": (bids_volume + asks_volume) / 1000,
-        "spread": spread,
-        "volatility": random.uniform(0.01, 0.1)
+        "spread_val": spread,
+        "volatility_val": random.uniform(0.01, 0.1)
     }
 
 def calculate_solidity_score(liquidity, spread, volatility):
     """
     Algorithm to rank 'Solid Bets'.
-    High Liquidity (Good) + Low Spread (Good) + Low Volatility (Good) = Solid
     """
-    # Normalize logic (0-100)
     l_score = min(liquidity / 100, 100) 
-    s_score = max(0, 100 - (spread * 2000)) # Penalize wide spreads
-    v_score = max(0, 100 - (volatility * 500)) # Penalize high volatility
+    s_score = max(0, 100 - (spread * 2000)) 
+    v_score = max(0, 100 - (volatility * 500))
     
     total = (l_score * 0.5) + (s_score * 0.3) + (v_score * 0.2)
     return round(total, 1)
@@ -79,15 +73,15 @@ markets = [
 df_data = []
 for m in markets:
     metrics = get_order_book_depth(m['id'])
-    score = calculate_solidity_score(metrics['liquidity_score'], metrics['spread'], metrics['volatility'])
+    score = calculate_solidity_score(metrics['liquidity_score'], metrics['spread_val'], metrics['volatility_val'])
     
     df_data.append({
         "Market Question": m['question'],
         "Category": m['category'],
         "Solidity Score": score,
-        "Liquidity ($k)": round(metrics['liquidity_score'], 1),
-        "Spread (%)": round(metrics['spread'] * 100, 2),
-        "Volatility": round(metrics['volatility'], 3)
+        "Liquidity": round(metrics['liquidity_score'], 1), # Simplified Name
+        "Spread": round(metrics['spread_val'] * 100, 2),   # Simplified Name
+        "Volatility": round(metrics['volatility_val'], 3)
     })
 
 df = pd.DataFrame(df_data)
@@ -101,7 +95,8 @@ df = df.sort_values(by="Solidity Score", ascending=False)
 col1, col2, col3 = st.columns(3)
 col1.metric("Markets Analyzed", len(df))
 col2.metric("Safest Market Score", df['Solidity Score'].max())
-col3.metric("Avg Liquidity Depth", f"${df['Liquidity ($)'].mean():,.0f}k")
+# FIXED: Accessing "Liquidity" column correctly
+col3.metric("Avg Liquidity Depth", f"${df['Liquidity'].mean():,.0f}k")
 
 # Main Data Table
 st.subheader("📊 Solid Bets Ranking (Filtered by Safety)")
@@ -115,13 +110,14 @@ st.dataframe(
             min_value=0,
             max_value=100,
         ),
-        "Liquidity ($)": st.column_config.NumberColumn("Depth", format="$%d k")
+        # FIXED: Mapping simplified name to config
+        "Liquidity": st.column_config.NumberColumn("Depth ($k)", format="$%d")
     },
     use_container_width=True,
     hide_index=True
 )
 
-# --- VISUALIZATION (The Order Book Depth Chart) ---
+# --- VISUALIZATION ---
 
 st.subheader("📈 Order Book Depth Analysis (Top Market)")
 
@@ -129,8 +125,7 @@ st.subheader("📈 Order Book Depth Analysis (Top Market)")
 safest_market = df.iloc[0]['Market Question']
 
 # Simulate an Order Book Curve
-prices = list(range(1, 100)) # 1 cent to 99 cents
-# Cumulative volume (The "Wall")
+prices = list(range(1, 100)) 
 bids = [random.randint(100, 1000) * (100-p) for p in prices] 
 asks = [random.randint(100, 1000) * p for p in prices]
 
@@ -147,5 +142,4 @@ fig.update_layout(
 
 st.plotly_chart(fig, use_container_width=True)
 
-# --- FOOTER ---
 st.caption("Data powered by Polygon Node (CTF Exchange Contract) | Algorithm based on Document Sections 3.3 & 4")
